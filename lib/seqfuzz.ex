@@ -15,7 +15,7 @@ defmodule Seqfuzz do
   ```elixir
   def deps do
     [
-      {:seqfuzz, "~> 0.1.0"}
+      {:seqfuzz, "~> 0.1.1"}
     ]
   end
   ```

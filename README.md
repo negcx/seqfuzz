@@ -16,7 +16,7 @@ The package can be installed by adding `seqfuzz` to your list of dependencies in
 ```elixir
 def deps do
   [
-    {:seqfuzz, "~> 0.1.0"}
+    {:seqfuzz, "~> 0.1.1"}
   ]
 end
 ```
