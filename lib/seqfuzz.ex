@@ -58,16 +58,27 @@ defmodule Seqfuzz do
   * Add support for asynchronous stream search.
   """
 
+  @sequential_bonus Application.get_env(:seqfuzz, :sequential_bonus, 15)
+  @separator_bonus Application.get_env(:seqfuzz, :separator_bonus, 30)
+  @camel_bonus Application.get_env(:seqfuzz, :camel_bonus, 30)
+  @first_letter_bonus Application.get_env(:seqfuzz, :first_letter_bonus, 15)
+  @leading_letter_penalty Application.get_env(:seqfuzz, :leading_letter_penalty, -3)
+  @max_leading_letter_penalty Application.get_env(:seqfuzz, :max_leading_letter_penalty, -25)
+  @unmatched_letter_penalty Application.get_env(:seqfuzz, :unmatched_letter_penalty, -1)
+  @case_match_bonus Application.get_env(:seqfuzz, :case_match_bonus, 1)
+  @string_match_bonus Application.get_env(:seqfuzz, :string_match_bonus, 20)
+  @separators Application.get_env(:seqfuzz, :separators, ["_", " ", ".", "/", ","])
+  @initial_score Application.get_env(:seqfuzz, :initial_score, 100)
+  @default_empty_score Application.get_env(:seqfuzz, :empty_score, -10_000)
+
   @type match_metadata :: %{match?: boolean, matches: [integer], score: integer}
 
   def match("", _pattern) do
-    default_empty_score = Application.get_env(:seqfuzz, :default_empty_score)
-    %{match?: false, score: default_empty_score, matches: []}
+    %{match?: false, score: @default_empty_score, matches: []}
   end
 
   def match(_string, "") do
-    default_empty_score = Application.get_env(:seqfuzz, :default_empty_score)
-    %{match?: true, score: default_empty_score, matches: []}
+    %{match?: true, score: @default_empty_score, matches: []}
   end
 
   @doc """
@@ -201,13 +212,11 @@ defmodule Seqfuzz do
     string_len = String.length(string)
     pattern_len = String.length(pattern)
 
-    initial_score = Application.get_env(:seqfuzz, :initial_score)
-
     case {string_len, string_idx, pattern_len, pattern_idx} do
       # Pattern length is 0
       {_, _, 0, _} ->
         score =
-          initial_score
+          @initial_score
           |> score_leading_letter(matches)
           |> score_sequential_bonus(matches)
           |> score_unmatched_letter_penalty(matches, string)
@@ -221,7 +230,7 @@ defmodule Seqfuzz do
       # String length is 0
       {0, _, _, _} ->
         score =
-          initial_score
+          @initial_score
           |> score_leading_letter(matches)
           |> score_sequential_bonus(matches)
           |> score_unmatched_letter_penalty(matches, string)
@@ -236,7 +245,7 @@ defmodule Seqfuzz do
       {string_len, string_idx, pattern_len, pattern_idx}
       when pattern_len - pattern_idx > string_len - string_idx ->
         score =
-          initial_score
+          @initial_score
           |> score_leading_letter(matches)
           |> score_sequential_bonus(matches)
           |> score_unmatched_letter_penalty(matches, string)
@@ -250,7 +259,7 @@ defmodule Seqfuzz do
       # No more pattern left - this is a match. Go to score.
       {_, _, pattern_len, pattern_idx} when pattern_len - pattern_idx == 0 ->
         score =
-          initial_score
+          @initial_score
           |> score_leading_letter(matches)
           |> score_sequential_bonus(matches)
           |> score_unmatched_letter_penalty(matches, string)
@@ -279,13 +288,11 @@ defmodule Seqfuzz do
   end
 
   defp score_leading_letter(score, matches) when length(matches) == 0 do
-    score + Application.get_env(:seqfuzz, :max_leading_letter_penalty)
+    score + @max_leading_letter_penalty
   end
 
   defp score_leading_letter(score, matches) when length(matches) > 0 do
-    leading_letter_penalty = Application.get_env(:seqfuzz, :leading_letter_penalty)
-    max_leading_letter_penalty = Application.get_env(:seqfuzz, :max_leading_letter_penalty)
-    score + max(leading_letter_penalty * Enum.at(matches, 0), max_leading_letter_penalty)
+    score + max(@leading_letter_penalty * Enum.at(matches, 0), @max_leading_letter_penalty)
   end
 
   defp score_sequential_bonus(score, matches) when length(matches) <= 1 do
@@ -293,20 +300,16 @@ defmodule Seqfuzz do
   end
 
   defp score_sequential_bonus(score, matches) when length(matches) > 1 do
-    sequential_bonus = Application.get_env(:seqfuzz, :sequential_bonus)
-
     [_head | tail] = matches
 
     (matches
      |> Enum.zip(tail)
      |> Enum.count(fn {curr, next} ->
        next - curr == 1
-     end)) * sequential_bonus + score
+     end)) * @sequential_bonus + score
   end
 
   defp score_unmatched_letter_penalty(score, matches, string) do
-    unmatched_letter_penalty = Application.get_env(:seqfuzz, :unmatched_letter_penalty)
-
     [_head | tail] = matches
 
     tail = tail ++ [String.length(string) - 1]
@@ -319,14 +322,10 @@ defmodule Seqfuzz do
      |> Enum.map(fn {curr, next} ->
        next - curr - 1
      end)
-     |> Enum.sum()) * unmatched_letter_penalty + score
+     |> Enum.sum()) * @unmatched_letter_penalty + score
   end
 
   defp score_neighbor(score, matches, string) do
-    separator_bonus = Application.get_env(:seqfuzz, :separator_bonus)
-    separators = Application.get_env(:seqfuzz, :separators)
-    camel_bonus = Application.get_env(:seqfuzz, :camel_bonus)
-
     (matches
      |> Enum.filter(&(&1 > 0))
      |> Enum.map(fn index ->
@@ -334,8 +333,8 @@ defmodule Seqfuzz do
        neighbor = String.at(string, index - 1)
 
        cond do
-         neighbor in separators -> separator_bonus
-         curr == String.upcase(curr) and neighbor == String.downcase(neighbor) -> camel_bonus
+         neighbor in @separators -> @separator_bonus
+         curr == String.upcase(curr) and neighbor == String.downcase(neighbor) -> @camel_bonus
          true -> 0
        end
      end)
@@ -343,29 +342,23 @@ defmodule Seqfuzz do
   end
 
   defp score_first_letter_bonus(score, matches) do
-    first_letter_bonus = Application.get_env(:seqfuzz, :first_letter_bonus)
-
     if matches |> hd == 0 do
-      first_letter_bonus + score
+      @first_letter_bonus + score
     else
       score
     end
   end
 
   defp score_case_match_bonus(score, matches, string, pattern) do
-    case_match_bonus = Application.get_env(:seqfuzz, :case_match_bonus)
-
     (0..(length(matches) - 1)
      |> Enum.count(fn match_idx ->
        String.at(pattern, match_idx) == String.at(string, Enum.fetch!(matches, match_idx))
-     end)) * case_match_bonus + score
+     end)) * @case_match_bonus + score
   end
 
   defp score_string_match_bonus(score, string, pattern) do
-    string_match_bonus = Application.get_env(:seqfuzz, :string_match_bonus)
-
     if String.downcase(string) == String.downcase(pattern) do
-      score + string_match_bonus
+      score + @string_match_bonus
     else
       score
     end
