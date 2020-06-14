@@ -11,4 +11,5 @@ config :seqfuzz,
   case_match_bonus: 1,
   string_match_bonus: 20,
   separators: ["_", " ", ".", "/", ","],
-  initial_score: 100
+  initial_score: 100,
+  default_empty_score: -10_000
