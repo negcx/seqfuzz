@@ -60,6 +60,16 @@ defmodule Seqfuzz do
 
   @type match_metadata :: %{match?: boolean, matches: [integer], score: integer}
 
+  def match("", _pattern) do
+    default_empty_score = Application.get_env(:seqfuzz, :default_empty_score)
+    %{match?: false, score: default_empty_score, matches: []}
+  end
+
+  def match(_string, "") do
+    default_empty_score = Application.get_env(:seqfuzz, :default_empty_score)
+    %{match?: true, score: default_empty_score, matches: []}
+  end
+
   @doc """
   Determines whether `pattern` is a sequential fuzzy match with `string` and provides a matching score. `matches` is a list of indices within `string` where a match was found.
 
@@ -268,13 +278,21 @@ defmodule Seqfuzz do
     end
   end
 
-  defp score_leading_letter(score, matches) do
-    leading_letter_penalty = Application.get_env(:seqfuzz, :leading_letter_penalty)
-    max_leading_letter_penalty = Application.get_env(:seqfuzz, :max_leading_letter_penalty)
-    score + max(leading_letter_penalty * Enum.fetch!(matches, 0), max_leading_letter_penalty)
+  defp score_leading_letter(score, matches) when length(matches) == 0 do
+    score + Application.get_env(:seqfuzz, :max_leading_letter_penalty)
   end
 
-  defp score_sequential_bonus(score, matches) do
+  defp score_leading_letter(score, matches) when length(matches) > 0 do
+    leading_letter_penalty = Application.get_env(:seqfuzz, :leading_letter_penalty)
+    max_leading_letter_penalty = Application.get_env(:seqfuzz, :max_leading_letter_penalty)
+    score + max(leading_letter_penalty * Enum.at(matches, 0), max_leading_letter_penalty)
+  end
+
+  defp score_sequential_bonus(score, matches) when length(matches) <= 1 do
+    score
+  end
+
+  defp score_sequential_bonus(score, matches) when length(matches) > 1 do
     sequential_bonus = Application.get_env(:seqfuzz, :sequential_bonus)
 
     [_head | tail] = matches
