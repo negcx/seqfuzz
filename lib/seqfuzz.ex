@@ -309,7 +309,7 @@ defmodule Seqfuzz do
      end)) * @sequential_bonus + score
   end
 
-  defp score_unmatched_letter_penalty(score, matches, string) do
+  defp score_unmatched_letter_penalty(score, matches, string) when length(matches) > 0 do
     [_head | tail] = matches
 
     tail = tail ++ [String.length(string) - 1]
@@ -323,6 +323,10 @@ defmodule Seqfuzz do
        next - curr - 1
      end)
      |> Enum.sum()) * @unmatched_letter_penalty + score
+  end
+
+  defp score_unmatched_letter_penalty(score, matches, string) when length(matches) == 0 do
+    score + String.length(string) * @unmatched_letter_penalty
   end
 
   defp score_neighbor(score, matches, string) do
@@ -341,12 +345,16 @@ defmodule Seqfuzz do
      |> Enum.sum()) + score
   end
 
-  defp score_first_letter_bonus(score, matches) do
-    if matches |> hd == 0 do
-      @first_letter_bonus + score
-    else
-      score
-    end
+  defp score_first_letter_bonus(score, [0 | _tail] = _matches) do
+    @first_letter_bonus + score
+  end
+
+  defp score_first_letter_bonus(score, _matches) do
+    score
+  end
+
+  defp score_case_match_bonus(score, [] = _matches, _, _) do
+    score
   end
 
   defp score_case_match_bonus(score, matches, string, pattern) do

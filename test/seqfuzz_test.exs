@@ -22,4 +22,8 @@ defmodule SeqfuzzTest do
   test "Empty pattern and string" do
     assert [""] |> Seqfuzz.filter("") == []
   end
+
+  test "No matches" do
+    assert ["XYZ", "zzz"] |> Seqfuzz.filter("f") == []
+  end
 end
