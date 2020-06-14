@@ -4,6 +4,22 @@ defmodule Seqfuzz do
 
   There is an alternate implementation by [@WolfDan](https://github.com/WolfDan) which can be found here: [Fuzzy Match v0.2.0 Elixir](https://github.com/tajmone/fuzzy-search/tree/master/fts_fuzzy_match/0.2.0/elixir).
 
+  ### Documentation
+  * **GitHub**:  [https://github.com/negcx/seqfuzz](https://github.com/negcx/seqfuzz)
+  * **Hexdocs**:  [https://hexdocs.pm/seqfuzz](https://hexdocs.pm/seqfuzz)
+
+  ## Installation
+
+  The package can be installed by adding `seqfuzz` to your list of dependencies in `mix.exs`:
+
+  ```elixir
+  def deps do
+    [
+      {:seqfuzz, "~> 0.1.0"}
+    ]
+  end
+  ```
+
   ## Examples
 
       iex> Seqfuzz.match("Hello, world!", "hellw")
