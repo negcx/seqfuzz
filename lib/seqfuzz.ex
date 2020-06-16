@@ -15,7 +15,7 @@ defmodule Seqfuzz do
   ```elixir
   def deps do
     [
-      {:seqfuzz, "~> 0.1.1"}
+      {:seqfuzz, "~> 0.2.0"}
     ]
   end
   ```
@@ -23,7 +23,7 @@ defmodule Seqfuzz do
   ## Examples
 
       iex> Seqfuzz.match("Hello, world!", "hellw")
-      %{match?: true, matches: [0, 1, 2, 3, 7], score: 187}
+      %{match?: true, matches: [0, 1, 2, 3, 7], score: 202}
 
       iex> items = [{1, "Hello Goodbye"}, {2, "Hell on Wheels"}, {3, "Hello, world!"}]
       iex> Seqfuzz.filter(items, "hellw", &(elem(&1, 1)))
@@ -31,25 +31,11 @@ defmodule Seqfuzz do
 
   ## Scoring
 
-  Scores can be configured in your mix configuration. I have added additional separators as a default as well as two additional scoring features: case match bonus and string match bonus. Case match bonus provides a small bonus for matching case. String match bonus provides a large bonus when the pattern and the string match exactly (although with different cases) to make sure that those results are always highest.
-
-  The default scores and available settings are:
-
-      config :seqfuzz,
-        sequential_bonus: 15,
-        separator_bonus: 30,
-        camel_bonus: 30,
-        first_letter_bonus: 15,
-        leading_letter_penalty: -3,
-        max_leading_letter_penalty: -25,
-        unmatched_letter_penalty: -1,
-        case_match_bonus: 1,
-        string_match_bonus: 20,
-        separators: ["_", " ", ".", "/", ","],
-        initial_score: 100
+  Scores can be passed as options if you want to override the defaults. I have added additional separators as a default as well as two additional scoring features: case match bonus and string match bonus. Case match bonus provides a small bonus for matching case. String match bonus provides a large bonus when the pattern and the string match exactly (although with different cases) to make sure that those results are always highest.
 
   ## Changelog
 
+  * `0.2.0` - Change scoring to be via options instead of configuration.
   * `0.1.0` - Initial version. Supports basic algorithm but does not search recursively for better matches.
 
   ## Roadmap
@@ -58,27 +44,38 @@ defmodule Seqfuzz do
   * Add support for asynchronous stream search.
   """
 
-  @sequential_bonus Application.get_env(:seqfuzz, :sequential_bonus, 15)
-  @separator_bonus Application.get_env(:seqfuzz, :separator_bonus, 30)
-  @camel_bonus Application.get_env(:seqfuzz, :camel_bonus, 30)
-  @first_letter_bonus Application.get_env(:seqfuzz, :first_letter_bonus, 15)
-  @leading_letter_penalty Application.get_env(:seqfuzz, :leading_letter_penalty, -3)
-  @max_leading_letter_penalty Application.get_env(:seqfuzz, :max_leading_letter_penalty, -25)
-  @unmatched_letter_penalty Application.get_env(:seqfuzz, :unmatched_letter_penalty, -1)
-  @case_match_bonus Application.get_env(:seqfuzz, :case_match_bonus, 1)
-  @string_match_bonus Application.get_env(:seqfuzz, :string_match_bonus, 20)
-  @separators Application.get_env(:seqfuzz, :separators, ["_", " ", ".", "/", ","])
-  @initial_score Application.get_env(:seqfuzz, :initial_score, 100)
-  @default_empty_score Application.get_env(:seqfuzz, :empty_score, -10_000)
-
   @type match_metadata :: %{match?: boolean, matches: [integer], score: integer}
 
-  def match("", _pattern) do
-    %{match?: false, score: @default_empty_score, matches: []}
+  defp default_options() do
+    [
+      sequential_bonus: 15,
+      separator_bonus: 30,
+      camel_bonus: 30,
+      first_letter_bonus: 30,
+      leading_letter_penalty: -3,
+      max_leading_letter_penalty: -25,
+      unmatched_letter_penalty: -1,
+      case_match_bonus: 1,
+      string_match_bonus: 20,
+      separators: ["_", " ", ".", "/", ","],
+      initial_score: 100,
+      default_empty_score: -10_000,
+      filter: false,
+      sort: false,
+      metadata: true
+    ]
   end
 
-  def match(_string, "") do
-    %{match?: true, score: @default_empty_score, matches: []}
+  def match(string, pattern, opts \\ [])
+
+  def match("", _pattern, opts) do
+    opts = default_options() |> Keyword.merge(opts)
+    %{match?: false, score: opts[:default_empty_score], matches: []}
+  end
+
+  def match(_string, "", opts) do
+    opts = default_options() |> Keyword.merge(opts)
+    %{match?: true, score: opts[:default_empty_score], matches: []}
   end
 
   @doc """
@@ -87,12 +84,13 @@ defmodule Seqfuzz do
   ## Examples
 
       iex> Seqfuzz.match("Hello, world!", "hellw")
-      %{match?: true, matches: [0, 1, 2, 3, 7], score: 187}
+      %{match?: true, matches: [0, 1, 2, 3, 7], score: 202}
 
   """
-  @spec match(String.t(), String.t()) :: match_metadata()
-  def match(string, pattern) do
-    match(string, pattern, 0, 0, [])
+  @spec match(String.t(), String.t(), keyword) :: match_metadata()
+  def match(string, pattern, opts) do
+    opts = default_options() |> Keyword.merge(opts)
+    match(string, pattern, 0, 0, [], opts)
   end
 
   @doc """
@@ -103,15 +101,26 @@ defmodule Seqfuzz do
   * `:sort` - Sort the enumerable by score, defaults to `false`.
   * `:filter` - Filter out elements that don't match, defaults to `false`.
   * `:metadata` - Include the match metadata map in the result, defaults to `true`. When `true` the return value is a tuple `{element, %{...}}`. When `false`, the return value is a list of `element`.
+  * `:sequential_bonus` Default: 15
+  * `:separator_bonus`: Default: 30
+  * `:camel_bonus` Default: 30
+  * `:first_letter_bonus` Default: 15
+  * `:leading_letter_penalty` Default: -3
+  * `:max_leading_letter_penalty` Default: -25
+  * `:unmatched_letter_penalty` Default: -1
+  * `:case_match_bonus` Default: 1
+  * `:string_match_bonus` Default: 20
+  * `:separators` Default: ["_", " ", ".", "/", ","]
+  * `:initial_score` Default: 100
 
   ## Examples
 
       iex> strings = ["Hello Goodbye", "Hell on Wheels", "Hello, world!"]
       iex> Seqfuzz.matches(strings, "hellw", & &1)
       [
-        {"Hello Goodbye", %{match?: false, matches: [0, 1, 2, 3], score: 155}},
-        {"Hell on Wheels", %{match?: true, matches: [0, 1, 2, 3, 8], score: 185}},
-        {"Hello, world!", %{match?: true, matches: [0, 1, 2, 3, 7], score: 187}}
+        {"Hello Goodbye", %{match?: false, matches: [0, 1, 2, 3], score: 170}},
+        {"Hell on Wheels", %{match?: true, matches: [0, 1, 2, 3, 8], score: 200}},
+        {"Hello, world!", %{match?: true, matches: [0, 1, 2, 3, 7], score: 202}}
       ]
 
       iex> strings = ["Hello Goodbye", "Hell on Wheels", "Hello, world!"]
@@ -129,11 +138,11 @@ defmodule Seqfuzz do
   @spec matches(Enumerable.t(), String.t(), (any -> String.t()), keyword) ::
           Enumerable.t() | [{any, match_metadata}]
   def matches(enumerable, pattern, string_callback, opts \\ []) do
-    opts = [sort: false, filter: false, metadata: true] |> Keyword.merge(opts)
+    opts = default_options() |> Keyword.merge(opts)
 
     enumerable
     |> Enum.map(fn item ->
-      {item, match(string_callback.(item), pattern)}
+      {item, match(string_callback.(item), pattern, opts)}
     end)
     |> matches_filter(opts[:filter])
     |> matches_sort(opts[:sort])
@@ -206,7 +215,7 @@ defmodule Seqfuzz do
     enumerable
   end
 
-  defp match(string, pattern, string_idx, pattern_idx, matches) do
+  defp match(string, pattern, string_idx, pattern_idx, matches, opts) do
     # We must use String.length and a case statement because
     # byte_size does not properly capture the length of UTF-8 strings.
     string_len = String.length(string)
@@ -216,28 +225,48 @@ defmodule Seqfuzz do
       # Pattern length is 0
       {_, _, 0, _} ->
         score =
-          @initial_score
-          |> score_leading_letter(matches)
-          |> score_sequential_bonus(matches)
-          |> score_unmatched_letter_penalty(matches, string)
-          |> score_neighbor(matches, string)
-          |> score_first_letter_bonus(matches)
-          |> score_case_match_bonus(matches, string, pattern)
-          |> score_string_match_bonus(string, pattern)
+          opts[:initial_score]
+          |> score_leading_letter(
+            matches,
+            opts[:leading_letter_penalty],
+            opts[:max_leading_letter_penalty]
+          )
+          |> score_sequential_bonus(matches, opts[:sequential_bonus])
+          |> score_unmatched_letter_penalty(matches, string, opts[:unmatched_letter_penalty])
+          |> score_neighbor(
+            matches,
+            string,
+            opts[:camel_bonus],
+            opts[:separator_bonus],
+            opts[:separators]
+          )
+          |> score_first_letter_bonus(matches, opts[:first_letter_bonus])
+          |> score_case_match_bonus(matches, string, pattern, opts[:case_match_bonus])
+          |> score_string_match_bonus(string, pattern, opts[:string_match_bonus])
 
         %{match?: false, score: score, matches: matches}
 
       # String length is 0
       {0, _, _, _} ->
         score =
-          @initial_score
-          |> score_leading_letter(matches)
-          |> score_sequential_bonus(matches)
-          |> score_unmatched_letter_penalty(matches, string)
-          |> score_neighbor(matches, string)
-          |> score_first_letter_bonus(matches)
-          |> score_case_match_bonus(matches, string, pattern)
-          |> score_string_match_bonus(string, pattern)
+          opts[:initial_score]
+          |> score_leading_letter(
+            matches,
+            opts[:leading_letter_penalty],
+            opts[:max_leading_letter_penalty]
+          )
+          |> score_sequential_bonus(matches, opts[:sequential_bonus])
+          |> score_unmatched_letter_penalty(matches, string, opts[:unmatched_letter_penalty])
+          |> score_neighbor(
+            matches,
+            string,
+            opts[:camel_bonus],
+            opts[:separator_bonus],
+            opts[:separators]
+          )
+          |> score_first_letter_bonus(matches, opts[:first_letter_bonus])
+          |> score_case_match_bonus(matches, string, pattern, opts[:case_match_bonus])
+          |> score_string_match_bonus(string, pattern, opts[:string_match_bonus])
 
         %{match?: false, score: score, matches: matches}
 
@@ -245,28 +274,48 @@ defmodule Seqfuzz do
       {string_len, string_idx, pattern_len, pattern_idx}
       when pattern_len - pattern_idx > string_len - string_idx ->
         score =
-          @initial_score
-          |> score_leading_letter(matches)
-          |> score_sequential_bonus(matches)
-          |> score_unmatched_letter_penalty(matches, string)
-          |> score_neighbor(matches, string)
-          |> score_first_letter_bonus(matches)
-          |> score_case_match_bonus(matches, string, pattern)
-          |> score_string_match_bonus(string, pattern)
+          opts[:initial_score]
+          |> score_leading_letter(
+            matches,
+            opts[:leading_letter_penalty],
+            opts[:max_leading_letter_penalty]
+          )
+          |> score_sequential_bonus(matches, opts[:sequential_bonus])
+          |> score_unmatched_letter_penalty(matches, string, opts[:unmatched_letter_penalty])
+          |> score_neighbor(
+            matches,
+            string,
+            opts[:camel_bonus],
+            opts[:separator_bonus],
+            opts[:separators]
+          )
+          |> score_first_letter_bonus(matches, opts[:first_letter_bonus])
+          |> score_case_match_bonus(matches, string, pattern, opts[:case_match_bonus])
+          |> score_string_match_bonus(string, pattern, opts[:string_match_bonus])
 
         %{match?: false, score: score, matches: matches}
 
       # No more pattern left - this is a match. Go to score.
       {_, _, pattern_len, pattern_idx} when pattern_len - pattern_idx == 0 ->
         score =
-          @initial_score
-          |> score_leading_letter(matches)
-          |> score_sequential_bonus(matches)
-          |> score_unmatched_letter_penalty(matches, string)
-          |> score_neighbor(matches, string)
-          |> score_first_letter_bonus(matches)
-          |> score_case_match_bonus(matches, string, pattern)
-          |> score_string_match_bonus(string, pattern)
+          opts[:initial_score]
+          |> score_leading_letter(
+            matches,
+            opts[:leading_letter_penalty],
+            opts[:max_leading_letter_penalty]
+          )
+          |> score_sequential_bonus(matches, opts[:sequential_bonus])
+          |> score_unmatched_letter_penalty(matches, string, opts[:unmatched_letter_penalty])
+          |> score_neighbor(
+            matches,
+            string,
+            opts[:camel_bonus],
+            opts[:separator_bonus],
+            opts[:separators]
+          )
+          |> score_first_letter_bonus(matches, opts[:first_letter_bonus])
+          |> score_case_match_bonus(matches, string, pattern, opts[:case_match_bonus])
+          |> score_string_match_bonus(string, pattern, opts[:string_match_bonus])
 
         %{match?: true, score: score, matches: matches}
 
@@ -280,36 +329,39 @@ defmodule Seqfuzz do
              string
              |> String.at(string_idx)
              |> String.downcase() do
-          match(string, pattern, string_idx + 1, pattern_idx + 1, matches ++ [string_idx])
+          match(string, pattern, string_idx + 1, pattern_idx + 1, matches ++ [string_idx], opts)
         else
-          match(string, pattern, string_idx + 1, pattern_idx, matches)
+          match(string, pattern, string_idx + 1, pattern_idx, matches, opts)
         end
     end
   end
 
-  defp score_leading_letter(score, matches) when length(matches) == 0 do
-    score + @max_leading_letter_penalty
+  defp score_leading_letter(score, matches, max_leading_letter_penalty, _leading_letter_penalty)
+       when length(matches) == 0 do
+    score + max_leading_letter_penalty
   end
 
-  defp score_leading_letter(score, matches) when length(matches) > 0 do
-    score + max(@leading_letter_penalty * Enum.at(matches, 0), @max_leading_letter_penalty)
+  defp score_leading_letter(score, matches, max_leading_letter_penalty, leading_letter_penalty)
+       when length(matches) > 0 do
+    score + max(leading_letter_penalty * Enum.at(matches, 0), max_leading_letter_penalty)
   end
 
-  defp score_sequential_bonus(score, matches) when length(matches) <= 1 do
+  defp score_sequential_bonus(score, matches, _sequential_bonus) when length(matches) <= 1 do
     score
   end
 
-  defp score_sequential_bonus(score, matches) when length(matches) > 1 do
+  defp score_sequential_bonus(score, matches, sequential_bonus) when length(matches) > 1 do
     [_head | tail] = matches
 
     (matches
      |> Enum.zip(tail)
      |> Enum.count(fn {curr, next} ->
        next - curr == 1
-     end)) * @sequential_bonus + score
+     end)) * sequential_bonus + score
   end
 
-  defp score_unmatched_letter_penalty(score, matches, string) when length(matches) > 0 do
+  defp score_unmatched_letter_penalty(score, matches, string, unmatched_letter_penalty)
+       when length(matches) > 0 do
     [_head | tail] = matches
 
     tail = tail ++ [String.length(string) - 1]
@@ -322,14 +374,15 @@ defmodule Seqfuzz do
      |> Enum.map(fn {curr, next} ->
        next - curr - 1
      end)
-     |> Enum.sum()) * @unmatched_letter_penalty + score
+     |> Enum.sum()) * unmatched_letter_penalty + score
   end
 
-  defp score_unmatched_letter_penalty(score, matches, string) when length(matches) == 0 do
-    score + String.length(string) * @unmatched_letter_penalty
+  defp score_unmatched_letter_penalty(score, matches, string, unmatched_letter_penalty)
+       when length(matches) == 0 do
+    score + String.length(string) * unmatched_letter_penalty
   end
 
-  defp score_neighbor(score, matches, string) do
+  defp score_neighbor(score, matches, string, camel_bonus, separator_bonus, separators) do
     (matches
      |> Enum.filter(&(&1 > 0))
      |> Enum.map(fn index ->
@@ -337,36 +390,36 @@ defmodule Seqfuzz do
        neighbor = String.at(string, index - 1)
 
        cond do
-         neighbor in @separators -> @separator_bonus
-         curr == String.upcase(curr) and neighbor == String.downcase(neighbor) -> @camel_bonus
+         neighbor in separators -> separator_bonus
+         curr == String.upcase(curr) and neighbor == String.downcase(neighbor) -> camel_bonus
          true -> 0
        end
      end)
      |> Enum.sum()) + score
   end
 
-  defp score_first_letter_bonus(score, [0 | _tail] = _matches) do
-    @first_letter_bonus + score
+  defp score_first_letter_bonus(score, [0 | _tail] = _matches, first_letter_bonus) do
+    first_letter_bonus + score
   end
 
-  defp score_first_letter_bonus(score, _matches) do
+  defp score_first_letter_bonus(score, _matches, _first_letter_bonus) do
     score
   end
 
-  defp score_case_match_bonus(score, [] = _matches, _, _) do
+  defp score_case_match_bonus(score, [] = _matches, _, _, _first_letter_bonus) do
     score
   end
 
-  defp score_case_match_bonus(score, matches, string, pattern) do
+  defp score_case_match_bonus(score, matches, string, pattern, case_match_bonus) do
     (0..(length(matches) - 1)
      |> Enum.count(fn match_idx ->
        String.at(pattern, match_idx) == String.at(string, Enum.fetch!(matches, match_idx))
-     end)) * @case_match_bonus + score
+     end)) * case_match_bonus + score
   end
 
-  defp score_string_match_bonus(score, string, pattern) do
+  defp score_string_match_bonus(score, string, pattern, string_match_bonus) do
     if String.downcase(string) == String.downcase(pattern) do
-      score + @string_match_bonus
+      score + string_match_bonus
     else
       score
     end
