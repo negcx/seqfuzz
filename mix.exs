@@ -33,7 +33,7 @@ defmodule Seqfuzz.MixProject do
 
   defp deps do
     [
-      {:ex_doc, "0.23.0", onLy: :dev, runtime: false}
+      {:ex_doc, "0.23.0", only: :dev, runtime: false}
     ]
   end
 end
