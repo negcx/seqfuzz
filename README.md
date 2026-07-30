@@ -14,7 +14,7 @@ The package can be installed by adding `seqfuzz` to your list of dependencies in
 ```elixir
 def deps do
   [
-    {:seqfuzz, "~> 0.2.0"}
+    {:seqfuzz, "~> 0.2.1"}
   ]
 end
 ```
@@ -34,6 +34,7 @@ Scores can be passed as options if you want to override the defaults. I have add
 
 ## Changelog
 
+- `0.2.1` - Update documentation dependencies to address security advisories.
 - `0.2.0` - Change scoring to be via options instead of configuration.
 - `0.1.0` - Initial version. Supports basic algorithm but does not search recursively for better matches.
 

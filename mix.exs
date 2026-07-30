@@ -4,7 +4,7 @@ defmodule Seqfuzz.MixProject do
   def project do
     [
       app: :seqfuzz,
-      version: "0.2.0",
+      version: "0.2.1",
       elixir: "~> 1.10",
       start_permanent: Mix.env() == :prod,
       deps: deps(),
@@ -33,7 +33,7 @@ defmodule Seqfuzz.MixProject do
 
   defp deps do
     [
-      {:ex_doc, "0.23.0", only: :dev, runtime: false}
+      {:ex_doc, "~> 0.40.3", only: :dev, runtime: false}
     ]
   end
 end
